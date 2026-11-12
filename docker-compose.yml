@@ -1,0 +1,85 @@
+services:
+  # ----------------------------------------------------------------------------
+  # Backend Service (Laravel REST API)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: umkm_backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      APP_NAME: "UMKM Financial Health Platform"
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: "http://localhost:8000"
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-bisnis_cerdas}
+      DB_USERNAME: ${DB_USERNAME:-bisnis_user}
+      DB_PASSWORD: ${DB_PASSWORD:-bisnis_secret_password}
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - umkm_network
+
+  # ----------------------------------------------------------------------------
+  # Frontend Service (React + Vite)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: umkm_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - umkm_network
+
+  # ----------------------------------------------------------------------------
+  # Database Service (Menggunakan image lokal mysql:8.4 yang sudah ada di Docker)
+  # ----------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.4
+    container_name: umkm_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-bisnis_cerdas}
+      MYSQL_USER: ${DB_USERNAME:-bisnis_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-bisnis_secret_password}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_secret_password}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-root_secret_password}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - umkm_network
+
+networks:
+  umkm_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
