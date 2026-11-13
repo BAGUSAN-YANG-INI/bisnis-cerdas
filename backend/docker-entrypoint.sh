@@ -1,26 +1,29 @@
 #!/bin/bash
 set -e
 
-# If composer.json exists but vendor does not, install dependencies
+# Jika perintah yang dipanggil BUKAN 'php artisan' default (misalnya composer, sh, bash, dll),
+# langsung jalankan perintah tersebut!
+if [ "$1" != "php" ] || [ "$2" != "artisan" ]; then
+    exec "$@"
+fi
+
+# Otomatis install composer jika composer.json ada tapi vendor belum ada
 if [ -f "composer.json" ] && [ ! -d "vendor" ]; then
     echo "[backend] Installing composer dependencies..."
     composer install --no-interaction --prefer-dist --optimize-autoloader || true
 fi
 
-# If .env does not exist and .env.example exists, copy it
+# Otomatis buat .env dari .env.example jika belum ada
 if [ ! -f ".env" ] && [ -f ".env.example" ]; then
     echo "[backend] Copying .env.example to .env..."
     cp .env.example .env
 fi
 
-# Check if artisan exists
+# Jalankan server jika artisan ada, atau standby jika belum ada
 if [ -f "artisan" ]; then
-    if [ ! -f ".env" ]; then
-        cp .env.example .env
-    fi
     exec "$@"
 else
     echo "[backend] Menunggu inisialisasi Laravel oleh developer di folder ./backend..."
-    echo "[backend] Letakkan project Laravel Anda di sini, service akan otomatis siap dijalankan."
+    echo "[backend] Jalankan 'docker compose run --rm backend ...' untuk inisialisasi."
     exec sleep infinity
 fi
