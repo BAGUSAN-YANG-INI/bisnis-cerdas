@@ -56,22 +56,17 @@ bisnis-cerdas/
 
 ## 👨‍💻 Panduan Inisialisasi untuk Developer
 
-### 1. Developer Backend (Laravel)
-Letakkan atau inisialisasi aplikasi Laravel di dalam direktori `backend/`:
+Jalankan perintah ini langsung dari **root folder project** (`bisnis-cerdas/`):
+
+### 1. Developer Backend (Laravel via Docker)
 ```bash
-cd backend
-composer create-project laravel/laravel temp
-mv temp/* .
-rmdir temp
+docker compose run --rm backend sh -c "composer create-project laravel/laravel /tmp/app && cp -r /tmp/app/. . && rm -rf /tmp/app"
 ```
 *Pastikan konfigurasi `.env` pada Laravel mengarah ke service MySQL (`DB_HOST=mysql`, `DB_PORT=3306`, `DB_DATABASE=bisnis_cerdas`).*
 
-### 2. Developer Frontend (React + Vite)
-Inisialisasi aplikasi React di dalam direktori `frontend/`:
+### 2. Developer Frontend (React + Vite via Docker)
 ```bash
-cd frontend
-npm create vite@latest . -- --template react
-npm install
+docker compose run --rm frontend sh -c "npx --yes create-vite@latest /tmp/app --template react && cp -r /tmp/app/. . && rm -rf /tmp/app && npm install"
 ```
 
 ---
