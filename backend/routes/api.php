@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessProfileController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\FinancialHealthController;
 use App\Http\Controllers\Api\TransactionController;
 use Illuminate\Support\Facades\Route;
 
@@ -36,5 +37,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // --- Dashboard ---
     Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    // --- Financial Health Engine ---
+    Route::get('/financial-health', [FinancialHealthController::class, 'index']);
 
 });

@@ -43,9 +43,11 @@ class CashCalculationService
         // ── Daily trend for chart ───────────────────────────────────────────
         $chartDailyTrend = $this->buildDailyTrend($from, $to);
 
-        // ── Stubs: health_score & runway (filled by later services) ─────────
-        $healthScoreSummary = $this->buildHealthScoreStub($availableCash, $period, $days);
-        $runwaySummary      = $this->buildRunwayStub($availableCash, $period, $days);
+        // ── Health score (via FinancialHealthService) ───────────────────────
+        $healthScoreSummary = (new FinancialHealthService($this->user))->summary($from, $to);
+
+        // ── Runway stub (keep until RunwayService is built in Module 5) ────
+        $runwaySummary = $this->buildRunwayStub($availableCash, $period, $days);
 
         return [
             'period' => [
@@ -175,65 +177,6 @@ class CashCalculationService
         }
 
         return $trend;
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // STUB BUILDERS  (replaced by real engines in later modules)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Lightweight health-score stub so the dashboard returns a valid response
-     * before the full FinancialHealthService is wired in.
-     */
-    private function buildHealthScoreStub(int $availableCash, array $period, int $days): array
-    {
-        $hasData = $period['total_income'] > 0 && $period['operating_expense'] > 0;
-
-        if (! $hasData) {
-            return [
-                'score'         => null,
-                'label'         => 'insufficient_data',
-                'label_display' => 'Data Belum Cukup',
-                'status'        => 'insufficient_data',
-            ];
-        }
-
-        // Quick rough score (3 metrics, each 0-100, equal weight of ~33%)
-        $monthlyOpEx        = $period['operating_expense'] / max(1, $days) * 30;
-        $cashCoverageMonths = $monthlyOpEx > 0 ? $availableCash / $monthlyOpEx : 0;
-        $cashScore          = min(100, (int) round($cashCoverageMonths / 3 * 100));
-
-        $oer         = $period['total_income'] > 0 ? $period['operating_expense'] / $period['total_income'] : 1;
-        $oerScore    = max(0, (int) round((1 - $oer) * 100));
-
-        $netMargin      = $period['total_income'] > 0 ? ($period['total_income'] - $period['total_expense']) / $period['total_income'] : 0;
-        $marginScore    = $netMargin >= 0 ? min(100, (int) round($netMargin * 100)) : 0;
-
-        $compositeScore = (int) round(($cashScore * 0.35) + ($oerScore * 0.35) + ($marginScore * 0.30));
-
-        $label = match (true) {
-            $compositeScore >= 80 => 'excellent',
-            $compositeScore >= 60 => 'good',
-            $compositeScore >= 40 => 'fair',
-            $compositeScore >= 20 => 'poor',
-            default               => 'critical',
-        };
-
-        $labelDisplay = match ($label) {
-            'excellent' => 'Sangat Sehat',
-            'good'      => 'Sehat',
-            'fair'      => 'Cukup Sehat',
-            'poor'      => 'Kurang Sehat',
-            'critical'  => 'Kritis',
-            default     => 'Data Belum Cukup',
-        };
-
-        return [
-            'score'         => $compositeScore,
-            'label'         => $label,
-            'label_display' => $labelDisplay,
-            'status'        => 'available',
-        ];
     }
 
     /**
