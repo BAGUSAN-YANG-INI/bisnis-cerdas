@@ -46,8 +46,8 @@ class CashCalculationService
         // ── Health score (via FinancialHealthService) ───────────────────────
         $healthScoreSummary = (new FinancialHealthService($this->user))->summary($from, $to);
 
-        // ── Runway stub (keep until RunwayService is built in Module 5) ────
-        $runwaySummary = $this->buildRunwayStub($availableCash, $period, $days);
+        // ── Historical runway (via RunwayService) ───────────────────────────
+        $runwaySummary = (new RunwayService($this->user))->historical($period, $days);
 
         return [
             'period' => [
@@ -179,47 +179,5 @@ class CashCalculationService
         return $trend;
     }
 
-    /**
-     * Lightweight runway stub so the dashboard returns a valid response
-     * before the full RunwayService is wired in.
-     */
-    private function buildRunwayStub(int $availableCash, array $period, int $days): array
-    {
-        $netCashFlow = $period['total_income'] - $period['total_expense'];
-
-        // Daily net burn = (expense - income) / days; positive means burning cash
-        $avgDailyIncome  = (int) round($period['total_income']  / $days);
-        $avgDailyExpense = (int) round($period['total_expense']  / $days);
-        $dailyNetBurn    = $avgDailyExpense - $avgDailyIncome;   // positive = burning
-
-        if ($netCashFlow >= 0) {
-            // Cash is growing or flat
-            $status = $netCashFlow === 0 ? 'break_even' : 'positive_cash_flow';
-            return [
-                'daily_net_burn' => -$dailyNetBurn,   // negative = not burning
-                'runway_days'    => null,
-                'status'         => $status,
-                'message'        => 'Arus kas bersih positif. Bisnis tidak mengalami pembakaran kas (net burn).',
-            ];
-        }
-
-        if ($availableCash <= 0) {
-            return [
-                'daily_net_burn' => $dailyNetBurn,
-                'runway_days'    => null,
-                'status'         => 'insufficient_cash',
-                'message'        => 'Kas tersedia sudah habis atau negatif.',
-            ];
-        }
-
-        $runwayDays = $dailyNetBurn > 0 ? (int) round($availableCash / $dailyNetBurn) : null;
-
-        return [
-            'daily_net_burn' => $dailyNetBurn,
-            'runway_days'    => $runwayDays,
-            'status'         => 'net_burn',
-            'message'        => "Dengan rata-rata pembakaran kas Rp" . number_format($dailyNetBurn, 0, ',', '.') . "/hari, kas diperkirakan bertahan {$runwayDays} hari ke depan.",
-        ];
-    }
 }
 

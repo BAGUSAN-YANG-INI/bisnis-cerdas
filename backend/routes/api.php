@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessProfileController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FinancialHealthController;
+use App\Http\Controllers\Api\RunwayController;
 use App\Http\Controllers\Api\TransactionController;
 use Illuminate\Support\Facades\Route;
 
@@ -40,5 +41,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // --- Financial Health Engine ---
     Route::get('/financial-health', [FinancialHealthController::class, 'index']);
+
+    // --- Runway Simulator ---
+    Route::post('/runway/simulate', [RunwayController::class, 'simulate']);
 
 });
