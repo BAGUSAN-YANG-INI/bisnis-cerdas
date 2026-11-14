@@ -7,8 +7,8 @@ if [ "$1" != "php" ] || [ "$2" != "artisan" ]; then
     exec "$@"
 fi
 
-# Otomatis install composer jika composer.json ada tapi vendor belum ada
-if [ -f "composer.json" ] && [ ! -d "vendor" ]; then
+# Otomatis install composer jika composer.json ada tapi vendor/autoload.php belum ada
+if [ -f "composer.json" ] && [ ! -f "vendor/autoload.php" ]; then
     echo "[backend] Installing composer dependencies..."
     composer install --no-interaction --prefer-dist --optimize-autoloader || true
 fi

@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   ReceiptText,
@@ -8,15 +8,23 @@ import {
   Plus,
   Store,
   RotateCcw,
-  TrendingUp
+  TrendingUp,
+  LogOut,
+  Database
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { formatRupiah } from '../utils/formatters';
 import { TransactionModal } from '../components/TransactionModal';
 
 export const MainLayout = () => {
-  const { user, metrics, setIsAddModalOpen, resetData } = useApp();
+  const { user, metrics, setIsAddModalOpen, resetData, isConnectedToBe, logout } = useApp();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
 
   const navItems = [
     { name: "Dashboard", to: "/dashboard", icon: LayoutDashboard },
@@ -102,8 +110,19 @@ export const MainLayout = () => {
           })}
         </nav>
 
-        {/* Footer / Demo Tools */}
-        <div className="p-3 border-t border-slate-100 space-y-1">
+        {/* Footer / Demo Tools & Logout */}
+        <div className="p-3 border-t border-slate-100 space-y-1.5">
+          <div className="flex items-center justify-between px-2 py-1 text-[10px]">
+            <span className="text-slate-400">Database API:</span>
+            {isConnectedToBe ? (
+              <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Laravel (Port 8000)
+              </span>
+            ) : (
+              <span className="text-slate-500">Mode Lokal (Mock)</span>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -115,6 +134,14 @@ export const MainLayout = () => {
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Reset Data Demo
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Keluar Akun (Logout)
           </button>
         </div>
       </aside>

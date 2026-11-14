@@ -13,12 +13,13 @@ const BUSINESS_TYPES = [
 ];
 
 export const RegisterPage = () => {
-  const { setUser } = useApp();
+  const { register, setUser } = useApp();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -57,23 +58,39 @@ export const RegisterPage = () => {
     if (validateStep1()) setStep(2);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateStep2()) return;
 
     const rawBalance = parseInt(String(form.initial_cash_balance).replace(/\D/g, ""), 10) || 0;
+    setLoading(true);
 
-    setUser({
-      id: Date.now(),
+    const result = await register({
       name: form.name.trim(),
       email: form.email.trim(),
+      password: form.password,
       business_name: form.business_name.trim(),
       business_type: form.business_type,
-      initial_cash_balance: rawBalance,
-      created_at: new Date().toISOString()
+      opening_balance: rawBalance
     });
 
-    navigate("/dashboard", { replace: true });
+    setLoading(false);
+
+    if (result.success) {
+      navigate("/dashboard", { replace: true });
+    } else {
+      // Local fallback
+      setUser({
+        id: Date.now(),
+        name: form.name.trim(),
+        email: form.email.trim(),
+        business_name: form.business_name.trim(),
+        business_type: form.business_type,
+        initial_cash_balance: rawBalance,
+        created_at: new Date().toISOString()
+      });
+      navigate("/dashboard", { replace: true });
+    }
   };
 
   const cashFormatted = form.initial_cash_balance

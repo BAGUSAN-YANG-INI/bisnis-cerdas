@@ -1,26 +1,42 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { TrendingUp, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { TrendingUp, Eye, EyeOff, AlertCircle, Database, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export const LoginPage = () => {
-  const { user } = useApp();
+  const { login, user } = useApp();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     if (!email || !password) {
       setError("Email dan kata sandi wajib diisi");
       return;
     }
-    // Demo mode: accept any email
-    navigate("/dashboard", { replace: true });
+
+    setLoading(true);
+    const result = await login(email, password);
+    setLoading(false);
+
+    if (result.success) {
+      navigate("/dashboard", { replace: true });
+    } else {
+      // Show warning or fallback option
+      setError(result.message || "Gagal terhubung ke backend. Periksa email atau jalankan mode demo.");
+    }
+  };
+
+  const fillDemoBackend = () => {
+    setEmail("budi@warungberkah.test");
+    setPassword("password123");
+    setError("");
   };
 
   return (
@@ -54,9 +70,24 @@ export const LoginPage = () => {
             </div>
           )}
 
-          {/* Demo Notice */}
-          <div className="mb-4 rounded-md bg-sky-50 border border-sky-200/80 p-3 text-[11px] text-sky-700 leading-relaxed">
-            <strong>Mode Demo:</strong> Isi email apa saja untuk masuk. Data usaha demo tersimpan lokal di browser Anda.
+          {/* Quick Backend Fill Button */}
+          <div className="mb-4 rounded-lg bg-emerald-50/80 border border-emerald-200 p-3">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
+                <Database className="h-3.5 w-3.5" />
+                Akun Demo Backend:
+              </span>
+              <button
+                type="button"
+                onClick={fillDemoBackend}
+                className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
+              >
+                Isi Otomatis
+              </button>
+            </div>
+            <p className="text-[11px] text-emerald-700 mt-1 font-mono">
+              budi@warungberkah.test (pass: password123)
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -97,9 +128,10 @@ export const LoginPage = () => {
 
             <button
               type="submit"
-              className="w-full rounded-md bg-emerald-700 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 transition shadow-xs cursor-pointer"
+              disabled={loading}
+              className="w-full rounded-md bg-emerald-700 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 transition shadow-xs cursor-pointer disabled:opacity-50"
             >
-              Masuk ke Dashboard
+              {loading ? "Menghubungkan ke Backend..." : "Masuk ke Dashboard"}
             </button>
           </form>
         </div>
@@ -118,7 +150,7 @@ export const LoginPage = () => {
             onClick={() => navigate("/dashboard", { replace: true })}
             className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2 cursor-pointer"
           >
-            Langsung masuk sebagai {user.name} (Demo)
+            Masuk Mode Standalone Demo ({user.name})
           </button>
         </div>
       </div>
