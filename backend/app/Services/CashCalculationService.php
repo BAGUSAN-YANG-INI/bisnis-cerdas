@@ -1,0 +1,183 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+
+class CashCalculationService
+{
+    private User $user;
+
+    public function __construct(User $user)
+    {
+        $this->user = $user;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PUBLIC ENTRY POINT
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Build the full dashboard data payload for the given period.
+     *
+     * @param  Carbon  $from  Start of period (inclusive)
+     * @param  Carbon  $to    End of period (inclusive)
+     * @return array<string, mixed>
+     */
+    public function getDashboardData(Carbon $from, Carbon $to): array
+    {
+        $days = max(1, $from->diffInDays($to) + 1);  // at least 1 day
+
+        // ── Period aggregates ───────────────────────────────────────────────
+        $period = $this->aggregatePeriod($from, $to);
+
+        // ── All-time available cash ─────────────────────────────────────────
+        $availableCash = $this->computeAvailableCash();
+
+        // ── Derived metrics ─────────────────────────────────────────────────
+        $avgDailyExpense = (int) round($period['total_expense'] / $days);
+        $netCashFlow     = $period['total_income'] - $period['total_expense'];
+
+        // ── Daily trend for chart ───────────────────────────────────────────
+        $chartDailyTrend = $this->buildDailyTrend($from, $to);
+
+        // ── Health score (via FinancialHealthService) ───────────────────────
+        $healthScoreSummary = (new FinancialHealthService($this->user))->summary($from, $to);
+
+        // ── Historical runway (via RunwayService) ───────────────────────────
+        $runwaySummary = (new RunwayService($this->user))->historical($period, $days);
+
+        return [
+            'period' => [
+                'from' => $from->toDateString(),
+                'to'   => $to->toDateString(),
+                'days' => $days,
+            ],
+            'summary' => [
+                'available_cash'          => $availableCash,
+                'total_income'            => $period['total_income'],
+                'total_expense'           => $period['total_expense'],
+                'operating_expense'       => $period['operating_expense'],
+                'non_operating_expense'   => $period['non_operating_expense'],
+                'net_cash_flow'           => $netCashFlow,
+                'average_daily_expense'   => $avgDailyExpense,
+            ],
+            'health_score_summary' => $healthScoreSummary,
+            'runway_summary'       => $runwaySummary,
+            'chart_daily_trend'    => $chartDailyTrend,
+        ];
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // AVAILABLE CASH  (cumulative, all-time)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * available_cash = opening_balance
+     *                + SUM(all income ever)
+     *                - SUM(all expense ever)
+     */
+    public function computeAvailableCash(): int
+    {
+        $openingBalance = (int) optional($this->user->businessProfile)->opening_balance;
+
+        $totals = $this->user
+            ->transactions()
+            ->selectRaw("
+                COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0) AS total_income,
+                COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS total_expense
+            ")
+            ->first();
+
+        return $openingBalance
+            + (int) ($totals->total_income ?? 0)
+            - (int) ($totals->total_expense ?? 0);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PERIOD AGGREGATES
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns aggregated totals for the given date range.
+     *
+     * @return array{
+     *   total_income: int,
+     *   total_expense: int,
+     *   operating_expense: int,
+     *   non_operating_expense: int,
+     * }
+     */
+    public function aggregatePeriod(Carbon $from, Carbon $to): array
+    {
+        $row = $this->user
+            ->transactions()
+            ->whereBetween('transaction_date', [$from->toDateString(), $to->toDateString()])
+            ->selectRaw("
+                COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0)                                     AS total_income,
+                COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)                                     AS total_expense,
+                COALESCE(SUM(CASE WHEN type = 'expense' AND is_operational = 1 THEN amount ELSE 0 END), 0)              AS operating_expense,
+                COALESCE(SUM(CASE WHEN type = 'expense' AND is_operational = 0 THEN amount ELSE 0 END), 0)              AS non_operating_expense
+            ")
+            ->first();
+
+        return [
+            'total_income'          => (int) ($row->total_income          ?? 0),
+            'total_expense'         => (int) ($row->total_expense         ?? 0),
+            'operating_expense'     => (int) ($row->operating_expense     ?? 0),
+            'non_operating_expense' => (int) ($row->non_operating_expense ?? 0),
+        ];
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // DAILY TREND (for chart)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Build an array of { date, income, expense, net } for every calendar day
+     * in the period. Days with no transactions still appear with zeros.
+     *
+     * @return list<array{date: string, income: int, expense: int, net: int}>
+     */
+    private function buildDailyTrend(Carbon $from, Carbon $to): array
+    {
+        // Fetch per-day aggregates from DB in one query
+        $rows = $this->user
+            ->transactions()
+            ->whereBetween('transaction_date', [$from->toDateString(), $to->toDateString()])
+            ->selectRaw("
+                transaction_date,
+                COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0) AS daily_income,
+                COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS daily_expense
+            ")
+            ->groupBy('transaction_date')
+            ->orderBy('transaction_date')
+            ->get()
+            ->keyBy(fn ($row) => Carbon::parse($row->transaction_date)->toDateString());
+
+        // Walk every day in the range (zero-fill gaps)
+        $trend   = [];
+        $current = $from->copy();
+
+        while ($current->lte($to)) {
+            $dateKey = $current->toDateString();
+            $income  = (int) ($rows[$dateKey]->daily_income  ?? 0);
+            $expense = (int) ($rows[$dateKey]->daily_expense ?? 0);
+
+            $trend[] = [
+                'date'    => $dateKey,
+                'income'  => $income,
+                'expense' => $expense,
+                'net'     => $income - $expense,
+            ];
+
+            $current->addDay();
+        }
+
+        return $trend;
+    }
+
+}
+
