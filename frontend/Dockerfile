@@ -5,9 +5,10 @@ COPY . .
 RUN if [ -f "package.json" ]; then npm install; fi
 
 # Stage 2: Development (Digunakan oleh docker-compose untuk local dev)
+# Stage 2: Development
 FROM base AS development
 EXPOSE 3000
-CMD ["sh", "-c", "if [ -f package.json ]; then npm run dev -- --host 0.0.0.0 --port 3000; else echo '[frontend] Menunggu inisialisasi project React di folder ./frontend...'; sleep infinity; fi"]
+CMD ["sh", "-c", "if [ -f package.json ]; then npm install && npm run dev -- --host 0.0.0.0 --port 3000; else echo '[frontend] Menunggu inisialisasi project React di folder ./frontend...'; sleep infinity; fi"]
 
 # Stage 3: Builder untuk production build
 FROM base AS builder
